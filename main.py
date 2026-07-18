@@ -14,28 +14,28 @@ from collections import Counter
 from pathlib import Path
 from typing import Optional, List
 
-# ── Compatibility shim ────────────────────────────────────────────────────────
+# -- Compatibility shim --------------------------------------------------------
 # best.pt was saved with an ultralytics version that included BCEDiceLoss.
-# Newer versions removed it. We only need it to unpickle the checkpoint —
+# Newer versions removed it. We only need it to unpickle the checkpoint -
 # it is never called during inference.
 import torch.nn as _nn
 import ultralytics.utils.loss as _loss
 
 if not hasattr(_loss, "BCEDiceLoss"):
     class _BCEDiceLoss(_nn.Module):
-        """Stub — only needed to unpickle checkpoints trained with older ultralytics."""
+        """Stub - only needed to unpickle checkpoints trained with older ultralytics."""
         def forward(self, pred, target):
-            raise NotImplementedError("BCEDiceLoss stub — inference only")
+            raise NotImplementedError("BCEDiceLoss stub - inference only")
     _loss.BCEDiceLoss = _BCEDiceLoss
 
 if not hasattr(_loss, "MultiChannelDiceLoss"):
     class _MultiChannelDiceLoss(_nn.Module):
-        """Stub — only needed to unpickle checkpoints trained with older ultralytics."""
+        """Stub - only needed to unpickle checkpoints trained with older ultralytics."""
         def forward(self, pred, target):
-            raise NotImplementedError("MultiChannelDiceLoss stub — inference only")
+            raise NotImplementedError("MultiChannelDiceLoss stub - inference only")
     _loss.MultiChannelDiceLoss = _MultiChannelDiceLoss
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 from fastapi import FastAPI, HTTPException
 from PIL import Image
@@ -46,14 +46,14 @@ import io
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# -- Paths ---------------------------------------------------------------------
 SERVICE_DIR   = Path(__file__).parent
 PROJECT_ROOT  = SERVICE_DIR.parent
 # MODEL_PATH can be overridden via env var for Docker deployments
 MODEL_PATH    = Path(os.environ.get("MODEL_PATH", str(PROJECT_ROOT / "best.pt")))
 NUTRITION_MAP_PATH = SERVICE_DIR / "nutrition_map.json"
 
-# ── Load model & nutrition map at startup ─────────────────────────────────────
+# -- Load model & nutrition map at startup -------------------------------------
 log.info(f"Loading YOLO model from {MODEL_PATH}")
 model = YOLO(str(MODEL_PATH))
 
@@ -62,7 +62,7 @@ with open(NUTRITION_MAP_PATH) as f:
 
 log.info(f"Loaded nutrition map with {len(NUTRITION_MAP)} entries")
 
-# ── FastAPI ───────────────────────────────────────────────────────────────────
+# -- FastAPI -------------------------------------------------------------------
 app = FastAPI(title="YOLO Food Vision Service", version="1.0.0")
 
 
@@ -95,7 +95,7 @@ def analyze(request: AnalyzeRequest):
     # Run YOLO inference
     results = model(img, conf=request.confidence_threshold, verbose=False)
 
-    # Collect detections — deduplicate by class name, keep highest confidence
+    # Collect detections - deduplicate by class name, keep highest confidence
     best: dict[str, float] = {}
     for r in results:
         if r.boxes is None:
@@ -120,7 +120,7 @@ def analyze(request: AnalyzeRequest):
     )
 
 
-# ── Nutrition aggregation ─────────────────────────────────────────────────────
+# -- Nutrition aggregation -----------------------------------------------------
 
 # Per-protein-type FPU kinetic constants (Warsaw Protocol + clinical literature)
 _PROTEIN_FPU: dict[str, dict] = {
@@ -174,7 +174,7 @@ def _aggregate_nutrition(foods: List[str]) -> dict:
     for food in foods:
         data = _lookup(food)
         if data is None:  # type: ignore
-            log.warning(f"No nutrition data for '{food}' — skipping")
+            log.warning(f"No nutrition data for '{food}' - skipping")
             continue
 
         factor    = data.get("serving_g", 100) / 100.0
@@ -190,7 +190,7 @@ def _aggregate_nutrition(foods: List[str]) -> dict:
         gi_x_carbs    += gi * carbs
         speeds.append(data.get("absorption", "DEFAULT"))
 
-        # FPU type-aware aggregation — weighted by protein kcal contribution
+        # FPU type-aware aggregation - weighted by protein kcal contribution
         fat_type     = data.get("fat_type",     "LCT")
         protein_type = data.get("protein_type", "ANIMAL")
 
